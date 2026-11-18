@@ -2,6 +2,7 @@
 package com.poolcompanion.app
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.text.InputType
 import android.os.Bundle
 import android.graphics.Color
@@ -16,6 +17,8 @@ import com.poolcompanion.app.calculator.ShotCalculator
 import com.poolcompanion.app.engine.PocketEngine
 import com.poolcompanion.app.engine.ShotMode
 import com.poolcompanion.app.engine.ShotPathEngine
+import com.poolcompanion.app.engine.ShotStatisticsEngine
+import com.poolcompanion.app.model.ShotRecord
 import java.util.Locale
 
 class MainActivity : Activity() {
@@ -190,6 +193,33 @@ class MainActivity : Activity() {
         }
 
         layout.addView(result)
+
+        val statisticsButton = Button(this).apply {
+            text = "VIEW STATISTICS"
+            setOnClickListener {
+                val message = String.format(
+                    Locale.US,
+                    "TOTAL SHOTS: %d\n" +
+                    "AVERAGE DISTANCE: %.2f units\n" +
+                    "AVERAGE CUT ANGLE: %.2f°\n" +
+                    "EASY SHOTS: %d\n" +
+                    "HARD SHOTS: %d",
+                    ShotStatisticsEngine.getTotalShots(),
+                    ShotStatisticsEngine.getAverageDistance(),
+                    ShotStatisticsEngine.getAverageCutAngle(),
+                    ShotStatisticsEngine.getEasyShots(),
+                    ShotStatisticsEngine.getHardShots()
+                )
+
+                AlertDialog.Builder(this@MainActivity)
+                    .setTitle("SHOT STATISTICS")
+                    .setMessage(message)
+                    .setPositiveButton("CLOSE", null)
+                    .show()
+            }
+        }
+
+        layout.addView(statisticsButton)
 
         val reset = Button(this).apply {
             text = "RESET"
@@ -389,6 +419,18 @@ class MainActivity : Activity() {
             pocketShot.difficulty,
             routeText
         )
+
+        if (showErrors) {
+            ShotStatisticsEngine.addShot(
+                ShotRecord(
+                    angle = aim?.angle ?: 0.0,
+                    distance = totalDistance,
+                    cutAngle = pocketShot.cutAngle,
+                    difficulty = pocketShot.difficulty,
+                    pocket = pocketShot.pocket.name
+                )
+            )
+        }
     }
 
     private fun showMessage(message: String) {
