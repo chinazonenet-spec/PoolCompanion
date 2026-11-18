@@ -11,8 +11,9 @@ import android.widget.TextView
 import android.widget.EditText
 import android.widget.Button
 import android.widget.Toast
-import kotlin.math.atan2
-import kotlin.math.hypot
+import com.poolcompanion.app.calculator.ShotCalculator
+import com.poolcompanion.app.engine.CushionEngine
+import java.util.Locale
 
 class MainActivity : Activity() {
 
@@ -45,7 +46,7 @@ class MainActivity : Activity() {
         layout.addView(title)
 
         val subtitle = TextView(this).apply {
-            text = "SMART AIM ENGINE"
+            text = "SMART AIM + CUSHION ENGINE"
             textSize = 16f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
@@ -77,7 +78,6 @@ class MainActivity : Activity() {
             textSize = 17f
             setTextColor(Color.BLACK)
             setBackgroundColor(green)
-
             setOnClickListener {
                 calculateShot()
             }
@@ -85,8 +85,8 @@ class MainActivity : Activity() {
         layout.addView(calculate)
 
         result = TextView(this).apply {
-            text = "SHOT ANGLE: --\nDISTANCE: --"
-            textSize = 19f
+            text = "SHOT ANGLE: --\nDISTANCE: --\nBANK SHOT: --"
+            textSize = 17f
             setTextColor(green)
             gravity = Gravity.CENTER
             setPadding(10, 20, 10, 20)
@@ -95,16 +95,18 @@ class MainActivity : Activity() {
 
         val reset = Button(this).apply {
             text = "RESET"
-
             setOnClickListener {
                 cueX.text.clear()
                 cueY.text.clear()
                 targetX.text.clear()
                 targetY.text.clear()
 
-                result.text = "SHOT ANGLE: --\nDISTANCE: --"
+                result.text =
+                    "SHOT ANGLE: --\nDISTANCE: --\nBANK SHOT: --"
 
-                aimView.setPoints(100.0, 100.0, 200.0, 200.0)
+                aimView.setPoints(
+                    100.0, 100.0, 200.0, 200.0
+                )
             }
         }
         layout.addView(reset)
@@ -130,7 +132,6 @@ class MainActivity : Activity() {
     }
 
     private fun calculateShot() {
-
         val x1 = cueX.text.toString().toDoubleOrNull()
         val y1 = cueY.text.toString().toDoubleOrNull()
         val x2 = targetX.text.toString().toDoubleOrNull()
@@ -138,39 +139,53 @@ class MainActivity : Activity() {
 
         if (x1 == null || y1 == null ||
             x2 == null || y2 == null) {
-
-            Toast.makeText(
-                this,
-                "Please enter all coordinates",
-                Toast.LENGTH_SHORT
-            ).show()
-
+            showMessage("Please enter all coordinates")
             return
         }
 
-        val dx = x2 - x1
-        val dy = y2 - y1
-
-        if (dx == 0.0 && dy == 0.0) {
-            Toast.makeText(
-                this,
-                "Ball positions must be different",
-                Toast.LENGTH_SHORT
-            ).show()
-
+        if (x1 !in 0.0..1000.0 ||
+            x2 !in 0.0..1000.0 ||
+            y1 !in 0.0..500.0 ||
+            y2 !in 0.0..500.0) {
+            showMessage(
+                "X must be 0-1000 and Y must be 0-500"
+            )
             return
         }
 
-        val angle = Math.toDegrees(atan2(dy, dx))
-        val distance = hypot(dx, dy)
+        val shot = ShotCalculator.calculate(
+            x1, y1, x2, y2
+        )
+
+        if (shot == null) {
+            showMessage("Ball positions must be different")
+            return
+        }
+
+        val bank = CushionEngine.predict(
+            x1, y1, x2, y2
+        )
 
         aimView.setPoints(x1, y1, x2, y2)
 
+        val bankText = bank?.let {
+            "${it.cushion} cushion"
+        } ?: "No valid one-cushion route"
+
         result.text = String.format(
-            java.util.Locale.US,
-            "SHOT ANGLE: %.2f°\nDISTANCE: %.2f units",
-            angle,
-            distance
+            Locale.US,
+            "SHOT ANGLE: %.2f°\nDISTANCE: %.2f units\nBANK SHOT: %s",
+            shot.angle,
+            shot.distance,
+            bankText
         )
+    }
+
+    private fun showMessage(message: String) {
+        Toast.makeText(
+            this,
+            message,
+            Toast.LENGTH_SHORT
+        ).show()
     }
 }

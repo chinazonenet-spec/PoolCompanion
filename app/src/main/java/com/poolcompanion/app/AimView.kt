@@ -6,6 +6,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.view.View
+import com.poolcompanion.app.engine.CushionEngine
 
 class AimView(context: Context) : View(context) {
 
@@ -35,74 +36,93 @@ class AimView(context: Context) : View(context) {
         val w = width.toFloat()
         val h = height.toFloat()
 
-        if (w <= 0 || h <= 0) return
+        if (w <= 0f || h <= 0f) return
 
-        // Pool table background
-        paint.color = Color.rgb(5, 90, 55)
+        val left = 25f
+        val top = 25f
+        val right = w - 25f
+        val bottom = h - 25f
+
         paint.style = Paint.Style.FILL
-
+        paint.color = Color.rgb(5, 90, 55)
         canvas.drawRoundRect(
-            RectF(8f, 8f, w - 8f, h - 8f),
-            24f, 24f, paint
+            RectF(left, top, right, bottom),
+            20f, 20f, paint
         )
 
-        // Table border
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 10f
         paint.color = Color.rgb(150, 100, 40)
-        paint.style = Paint.Style.STROKE
-        paint.strokeWidth = 12f
         canvas.drawRoundRect(
-            RectF(8f, 8f, w - 8f, h - 8f),
-            24f, 24f, paint
+            RectF(left, top, right, bottom),
+            20f, 20f, paint
         )
 
-        val minX = minOf(cueX, targetX)
-        val maxX = maxOf(cueX, targetX)
-        val minY = minOf(cueY, targetY)
-        val maxY = maxOf(cueY, targetY)
+        fun screenX(x: Double): Float =
+            left + (x / 1000.0 * (right - left)).toFloat()
 
-        val rangeX = maxOf(1.0, maxX - minX)
-        val rangeY = maxOf(1.0, maxY - minY)
+        fun screenY(y: Double): Float =
+            top + (y / 500.0 * (bottom - top)).toFloat()
 
-        val margin = 55f
+        val cx = screenX(cueX)
+        val cy = screenY(cueY)
+        val tx = screenX(targetX)
+        val ty = screenY(targetY)
 
-        val usableW = (w - margin * 2).coerceAtLeast(1f)
-        val usableH = (h - margin * 2).coerceAtLeast(1f)
-
-        val ballX = { x: Double ->
-            margin + ((x - minX) / rangeX * usableW).toFloat()
-        }
-
-        val ballY = { y: Double ->
-            margin + ((y - minY) / rangeY * usableH).toFloat()
-        }
-
-        val cx = ballX(cueX)
-        val cy = ballY(cueY)
-        val tx = ballX(targetX)
-        val ty = ballY(targetY)
-
-        // Aiming line
+        // Direct aiming line
         paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 3f
         paint.color = Color.YELLOW
-        paint.strokeWidth = 5f
-
         canvas.drawLine(cx, cy, tx, ty, paint)
+
+        // One-cushion prediction
+        val prediction = CushionEngine.predict(
+            cueX, cueY, targetX, targetY
+        )
+
+        if (prediction != null) {
+            val bx = screenX(prediction.bounceX)
+            val by = screenY(prediction.bounceY)
+
+            // Cue ball to cushion
+            paint.color = Color.CYAN
+            paint.strokeWidth = 5f
+            canvas.drawLine(cx, cy, bx, by, paint)
+
+            // Cushion to target ball
+            canvas.drawLine(bx, by, tx, ty, paint)
+
+            // Bounce point
+            paint.style = Paint.Style.FILL
+            paint.color = Color.rgb(255, 140, 0)
+            canvas.drawCircle(bx, by, 11f, paint)
+
+            // Cushion label
+            paint.color = Color.WHITE
+            paint.textSize = 18f
+            paint.textAlign = Paint.Align.CENTER
+            canvas.drawText(
+                prediction.cushion,
+                bx,
+                by - 18f,
+                paint
+            )
+        }
 
         // Cue ball
         paint.style = Paint.Style.FILL
         paint.color = Color.WHITE
-        canvas.drawCircle(cx, cy, 19f, paint)
+        canvas.drawCircle(cx, cy, 16f, paint)
 
         // Target ball
         paint.color = Color.RED
-        canvas.drawCircle(tx, ty, 19f, paint)
+        canvas.drawCircle(tx, ty, 16f, paint)
 
-        // Ball labels
         paint.color = Color.WHITE
-        paint.textSize = 25f
+        paint.textSize = 18f
         paint.textAlign = Paint.Align.CENTER
 
-        canvas.drawText("CUE", cx, cy - 28f, paint)
-        canvas.drawText("TARGET", tx, ty - 28f, paint)
+        canvas.drawText("CUE", cx, cy - 22f, paint)
+        canvas.drawText("TARGET", tx, ty - 22f, paint)
     }
 }
