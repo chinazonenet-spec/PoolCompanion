@@ -1,3 +1,4 @@
+
 package com.poolcompanion.app
 
 import android.content.Context
@@ -6,7 +7,8 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.view.View
-import com.poolcompanion.app.engine.CushionEngine
+import com.poolcompanion.app.engine.ShotMode
+import com.poolcompanion.app.engine.ShotPathEngine
 
 class AimView(context: Context) : View(context) {
 
@@ -16,6 +18,7 @@ class AimView(context: Context) : View(context) {
     private var cueY = 100.0
     private var targetX = 200.0
     private var targetY = 200.0
+    private var mode = ShotMode.DIRECT
 
     fun setPoints(
         cx: Double,
@@ -27,6 +30,11 @@ class AimView(context: Context) : View(context) {
         cueY = cy
         targetX = tx
         targetY = ty
+        invalidate()
+    }
+
+    fun setMode(newMode: ShotMode) {
+        mode = newMode
         invalidate()
     }
 
@@ -45,6 +53,7 @@ class AimView(context: Context) : View(context) {
 
         paint.style = Paint.Style.FILL
         paint.color = Color.rgb(5, 90, 55)
+
         canvas.drawRoundRect(
             RectF(left, top, right, bottom),
             20f, 20f, paint
@@ -53,6 +62,7 @@ class AimView(context: Context) : View(context) {
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 10f
         paint.color = Color.rgb(150, 100, 40)
+
         canvas.drawRoundRect(
             RectF(left, top, right, bottom),
             20f, 20f, paint
@@ -69,52 +79,80 @@ class AimView(context: Context) : View(context) {
         val tx = screenX(targetX)
         val ty = screenY(targetY)
 
-        // Direct aiming line
-        paint.style = Paint.Style.STROKE
-        paint.strokeWidth = 3f
-        paint.color = Color.YELLOW
-        canvas.drawLine(cx, cy, tx, ty, paint)
-
-        // One-cushion prediction
-        val prediction = CushionEngine.predict(
-            cueX, cueY, targetX, targetY
+        val path = ShotPathEngine.calculate(
+            cueX, cueY, targetX, targetY, mode
         )
 
-        if (prediction != null) {
-            val bx = screenX(prediction.bounceX)
-            val by = screenY(prediction.bounceY)
+        if (path != null) {
 
-            // Cue ball to cushion
-            paint.color = Color.CYAN
+            val route = mutableListOf<Pair<Float, Float>>()
+            route.add(cx to cy)
+
+            for (point in path.bouncePoints) {
+                route.add(
+                    screenX(point.x) to screenY(point.y)
+                )
+            }
+
+            route.add(tx to ty)
+
+            paint.style = Paint.Style.STROKE
             paint.strokeWidth = 5f
-            canvas.drawLine(cx, cy, bx, by, paint)
 
-            // Cushion to target ball
-            canvas.drawLine(bx, by, tx, ty, paint)
+            paint.color = if (mode == ShotMode.DIRECT) {
+                Color.YELLOW
+            } else {
+                Color.CYAN
+            }
 
-            // Bounce point
-            paint.style = Paint.Style.FILL
-            paint.color = Color.rgb(255, 140, 0)
-            canvas.drawCircle(bx, by, 11f, paint)
+            for (i in 0 until route.size - 1) {
+                canvas.drawLine(
+                    route[i].first,
+                    route[i].second,
+                    route[i + 1].first,
+                    route[i + 1].second,
+                    paint
+                )
+            }
 
-            // Cushion label
-            paint.color = Color.WHITE
+            for (point in path.bouncePoints) {
+                val bx = screenX(point.x)
+                val by = screenY(point.y)
+
+                paint.style = Paint.Style.FILL
+                paint.color = Color.rgb(255, 140, 0)
+                canvas.drawCircle(bx, by, 11f, paint)
+
+                paint.color = Color.WHITE
+                paint.textSize = 18f
+                paint.textAlign = Paint.Align.CENTER
+
+                canvas.drawText(
+                    point.cushion,
+                    bx,
+                    by - 18f,
+                    paint
+                )
+            }
+        } else if (mode != ShotMode.DIRECT) {
+
+            paint.color = Color.RED
             paint.textSize = 18f
             paint.textAlign = Paint.Align.CENTER
+            paint.style = Paint.Style.FILL
+
             canvas.drawText(
-                prediction.cushion,
-                bx,
-                by - 18f,
+                "NO VALID ROUTE",
+                (left + right) / 2f,
+                (top + bottom) / 2f,
                 paint
             )
         }
 
-        // Cue ball
         paint.style = Paint.Style.FILL
         paint.color = Color.WHITE
         canvas.drawCircle(cx, cy, 16f, paint)
 
-        // Target ball
         paint.color = Color.RED
         canvas.drawCircle(tx, ty, 16f, paint)
 
