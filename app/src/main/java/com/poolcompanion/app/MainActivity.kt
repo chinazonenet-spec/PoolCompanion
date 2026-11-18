@@ -5,6 +5,7 @@ import android.text.InputType
 import android.os.Bundle
 import android.graphics.Color
 import android.view.Gravity
+import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.EditText
@@ -20,6 +21,7 @@ class MainActivity : Activity() {
     private lateinit var targetX: EditText
     private lateinit var targetY: EditText
     private lateinit var result: TextView
+    private lateinit var aimView: AimView
 
     private val green = Color.rgb(0, 255, 120)
     private val dark = Color.rgb(10, 15, 12)
@@ -30,26 +32,24 @@ class MainActivity : Activity() {
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setPadding(24, 30, 24, 30)
+            setPadding(24, 20, 24, 20)
             setBackgroundColor(dark)
         }
 
         val title = TextView(this).apply {
-            text = "SMART AIM ENGINE"
+            text = "POOL COMPANION"
             textSize = 25f
             setTextColor(green)
             gravity = Gravity.CENTER
         }
-
         layout.addView(title)
 
         val subtitle = TextView(this).apply {
-            text = "ENTER BALL COORDINATES"
-            textSize = 14f
+            text = "SMART AIM ENGINE"
+            textSize = 16f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
         }
-
         layout.addView(subtitle)
 
         cueX = createInput("Cue Ball X")
@@ -62,6 +62,16 @@ class MainActivity : Activity() {
         layout.addView(targetX)
         layout.addView(targetY)
 
+        aimView = AimView(this)
+
+        layout.addView(
+            aimView,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                300
+            )
+        )
+
         val calculate = Button(this).apply {
             text = "CALCULATE SHOT"
             textSize = 17f
@@ -72,7 +82,6 @@ class MainActivity : Activity() {
                 calculateShot()
             }
         }
-
         layout.addView(calculate)
 
         result = TextView(this).apply {
@@ -80,23 +89,27 @@ class MainActivity : Activity() {
             textSize = 19f
             setTextColor(green)
             gravity = Gravity.CENTER
-            setPadding(10, 35, 10, 35)
+            setPadding(10, 20, 10, 20)
         }
-
         layout.addView(result)
 
         val reset = Button(this).apply {
             text = "RESET"
+
             setOnClickListener {
                 cueX.text.clear()
                 cueY.text.clear()
                 targetX.text.clear()
                 targetY.text.clear()
+
                 result.text = "SHOT ANGLE: --\nDISTANCE: --"
+
+                aimView.setPoints(100.0, 100.0, 200.0, 200.0)
             }
         }
-
         layout.addView(reset)
+
+        aimView.setPoints(100.0, 100.0, 200.0, 200.0)
 
         setContentView(layout)
     }
@@ -107,14 +120,17 @@ class MainActivity : Activity() {
             textSize = 16f
             setTextColor(Color.WHITE)
             setHintTextColor(Color.LTGRAY)
+
             inputType = InputType.TYPE_CLASS_NUMBER or
                 InputType.TYPE_NUMBER_FLAG_DECIMAL or
                 InputType.TYPE_NUMBER_FLAG_SIGNED
-            setPadding(15, 10, 15, 10)
+
+            setPadding(15, 8, 15, 8)
         }
     }
 
     private fun calculateShot() {
+
         val x1 = cueX.text.toString().toDoubleOrNull()
         val y1 = cueY.text.toString().toDoubleOrNull()
         val x2 = targetX.text.toString().toDoubleOrNull()
@@ -122,11 +138,13 @@ class MainActivity : Activity() {
 
         if (x1 == null || y1 == null ||
             x2 == null || y2 == null) {
+
             Toast.makeText(
                 this,
                 "Please enter all coordinates",
                 Toast.LENGTH_SHORT
             ).show()
+
             return
         }
 
@@ -139,11 +157,14 @@ class MainActivity : Activity() {
                 "Ball positions must be different",
                 Toast.LENGTH_SHORT
             ).show()
+
             return
         }
 
         val angle = Math.toDegrees(atan2(dy, dx))
         val distance = hypot(dx, dy)
+
+        aimView.setPoints(x1, y1, x2, y2)
 
         result.text = String.format(
             java.util.Locale.US,
