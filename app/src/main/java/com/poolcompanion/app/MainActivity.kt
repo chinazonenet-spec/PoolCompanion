@@ -5,7 +5,6 @@ import android.text.InputType
 import android.os.Bundle
 import android.graphics.Color
 import android.view.Gravity
-import android.view.inputmethod.InputType
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.EditText
