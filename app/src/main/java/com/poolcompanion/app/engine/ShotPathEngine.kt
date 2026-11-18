@@ -1,5 +1,7 @@
+
 package com.poolcompanion.app.engine
 
+import kotlin.math.abs
 import kotlin.math.hypot
 
 enum class ShotMode {
@@ -22,6 +24,17 @@ data class ShotPath(
 
 object ShotPathEngine {
 
+    private fun fold(value: Double, size: Double): Double {
+        val period = 2.0 * size
+        val position = ((value % period) + period) % period
+
+        return if (position <= size) {
+            position
+        } else {
+            period - position
+        }
+    }
+
     fun calculate(
         startX: Double,
         startY: Double,
@@ -43,9 +56,9 @@ object ShotPathEngine {
 
         if (mode == ShotMode.DIRECT) {
             return ShotPath(
-                bouncePoints = emptyList(),
-                distance = hypot(targetX - startX, targetY - startY),
-                routeName = "DIRECT"
+                emptyList(),
+                hypot(targetX - startX, targetY - startY),
+                "DIRECT"
             )
         }
 
@@ -56,14 +69,12 @@ object ShotPathEngine {
                 0 to -1,
                 0 to 1
             )
-
             ShotMode.TWO_CUSHION -> listOf(
                 -1 to -1,
                 -1 to 1,
                 1 to -1,
                 1 to 1
             )
-
             else -> emptyList()
         }
 
@@ -86,26 +97,32 @@ object ShotPathEngine {
             val dx = imageX - startX
             val dy = imageY - startY
 
-            val intersections = mutableListOf<Pair<Double, RoutePoint>>()
+            val points = mutableListOf<Pair<Double, RoutePoint>>()
 
             if (kx != 0) {
                 if (dx == 0.0) continue
 
                 val wallX = if (kx == -1) 0.0 else tableWidth
                 val t = (wallX - startX) / dx
-                val y = startY + t * dy
+                val rawY = startY + t * dy
 
-                if (t > 0.0 && t < 1.0 &&
-                    y in 0.0..tableHeight) {
+                if (t <= 0.0 || t >= 1.0) continue
 
-                    intersections.add(
-                        t to RoutePoint(
-                            wallX,
-                            y,
-                            if (kx == -1) "LEFT" else "RIGHT"
-                        )
-                    )
+                val y = if (mode == ShotMode.TWO_CUSHION) {
+                    fold(rawY, tableHeight)
+                } else {
+                    rawY
                 }
+
+                if (y !in 0.0..tableHeight) continue
+
+                points.add(
+                    t to RoutePoint(
+                        wallX,
+                        y,
+                        if (kx == -1) "LEFT" else "RIGHT"
+                    )
+                )
             }
 
             if (ky != 0) {
@@ -113,46 +130,48 @@ object ShotPathEngine {
 
                 val wallY = if (ky == -1) 0.0 else tableHeight
                 val t = (wallY - startY) / dy
-                val x = startX + t * dx
+                val rawX = startX + t * dx
 
-                if (t > 0.0 && t < 1.0 &&
-                    x in 0.0..tableWidth) {
+                if (t <= 0.0 || t >= 1.0) continue
 
-                    intersections.add(
-                        t to RoutePoint(
-                            x,
-                            wallY,
-                            if (ky == -1) "TOP" else "BOTTOM"
-                        )
-                    )
+                val x = if (mode == ShotMode.TWO_CUSHION) {
+                    fold(rawX, tableWidth)
+                } else {
+                    rawX
                 }
+
+                if (x !in 0.0..tableWidth) continue
+
+                points.add(
+                    t to RoutePoint(
+                        x,
+                        wallY,
+                        if (ky == -1) "TOP" else "BOTTOM"
+                    )
+                )
             }
 
-            val expectedCount = if (
+            val required = if (
                 mode == ShotMode.ONE_CUSHION
             ) 1 else 2
 
-            if (intersections.size != expectedCount) continue
+            if (points.size != required) continue
 
-            intersections.sortBy { it.first }
+            points.sortBy { it.first }
 
-            if (intersections.size == 2 &&
-                kotlin.math.abs(
-                    intersections[0].first -
-                    intersections[1].first
-                ) < 0.000001) continue
+            if (points.size == 2 &&
+                abs(points[0].first - points[1].first) < 0.000001
+            ) continue
 
-            val bouncePoints = intersections.map { it.second }
-
-            val routeName = bouncePoints.joinToString(" → ") {
-                it.cushion
-            }
+            val route = points.map { it.second }
 
             candidates.add(
                 ShotPath(
-                    bouncePoints = bouncePoints,
+                    bouncePoints = route,
                     distance = hypot(dx, dy),
-                    routeName = routeName
+                    routeName = route.joinToString(" → ") {
+                        it.cushion
+                    }
                 )
             )
         }
