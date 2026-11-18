@@ -7,6 +7,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.view.View
+import com.poolcompanion.app.engine.PocketEngine
 import com.poolcompanion.app.engine.ShotMode
 import com.poolcompanion.app.engine.ShotPathEngine
 
@@ -19,6 +20,7 @@ class AimView(context: Context) : View(context) {
     private var targetX = 200.0
     private var targetY = 200.0
     private var mode = ShotMode.DIRECT
+    private var selectedPocket = "TOP RIGHT"
 
     fun setPoints(
         cx: Double,
@@ -35,6 +37,11 @@ class AimView(context: Context) : View(context) {
 
     fun setMode(newMode: ShotMode) {
         mode = newMode
+        invalidate()
+    }
+
+    fun setPocket(name: String) {
+        selectedPocket = name
         invalidate()
     }
 
@@ -79,85 +86,124 @@ class AimView(context: Context) : View(context) {
         val tx = screenX(targetX)
         val ty = screenY(targetY)
 
-        val path = ShotPathEngine.calculate(
-            cueX, cueY, targetX, targetY, mode
-        )
+        // Draw six pockets
+        for (pocket in PocketEngine.pockets) {
+            val px = screenX(pocket.x)
+            val py = screenY(pocket.y)
 
-        if (path != null) {
+            paint.style = Paint.Style.FILL
+            paint.color = Color.BLACK
+            canvas.drawCircle(px, py, 13f, paint)
 
-            val route = mutableListOf<Pair<Float, Float>>()
-            route.add(cx to cy)
-
-            for (point in path.bouncePoints) {
-                route.add(
-                    screenX(point.x) to screenY(point.y)
-                )
+            if (pocket.name == selectedPocket) {
+                paint.style = Paint.Style.STROKE
+                paint.strokeWidth = 3f
+                paint.color = Color.YELLOW
+                canvas.drawCircle(px, py, 17f, paint)
             }
+        }
 
-            route.add(tx to ty)
+        // Draw selected cushion route
+        if (mode != ShotMode.DIRECT) {
+            val path = ShotPathEngine.calculate(
+                cueX, cueY, targetX, targetY, mode
+            )
 
-            paint.style = Paint.Style.STROKE
-            paint.strokeWidth = 5f
+            if (path != null) {
+                val route = mutableListOf<Pair<Float, Float>>()
+                route.add(cx to cy)
 
-            paint.color = if (mode == ShotMode.DIRECT) {
-                Color.YELLOW
-            } else {
-                Color.CYAN
-            }
+                for (point in path.bouncePoints) {
+                    route.add(
+                        screenX(point.x) to screenY(point.y)
+                    )
+                }
 
-            for (i in 0 until route.size - 1) {
-                canvas.drawLine(
-                    route[i].first,
-                    route[i].second,
-                    route[i + 1].first,
-                    route[i + 1].second,
-                    paint
-                )
-            }
+                route.add(tx to ty)
 
-            for (point in path.bouncePoints) {
-                val bx = screenX(point.x)
-                val by = screenY(point.y)
+                paint.style = Paint.Style.STROKE
+                paint.strokeWidth = 3f
+                paint.color = Color.CYAN
+
+                for (i in 0 until route.size - 1) {
+                    canvas.drawLine(
+                        route[i].first,
+                        route[i].second,
+                        route[i + 1].first,
+                        route[i + 1].second,
+                        paint
+                    )
+                }
 
                 paint.style = Paint.Style.FILL
                 paint.color = Color.rgb(255, 140, 0)
-                canvas.drawCircle(bx, by, 11f, paint)
 
-                paint.color = Color.WHITE
-                paint.textSize = 18f
-                paint.textAlign = Paint.Align.CENTER
-
-                canvas.drawText(
-                    point.cushion,
-                    bx,
-                    by - 18f,
-                    paint
-                )
+                for (point in path.bouncePoints) {
+                    canvas.drawCircle(
+                        screenX(point.x),
+                        screenY(point.y),
+                        8f,
+                        paint
+                    )
+                }
             }
-        } else if (mode != ShotMode.DIRECT) {
+        }
 
-            paint.color = Color.RED
-            paint.textSize = 18f
-            paint.textAlign = Paint.Align.CENTER
+        // Calculate selected pocket shot
+        val pocketShot = PocketEngine.evaluate(
+            cueX, cueY,
+            targetX, targetY,
+            selectedPocket
+        )
+
+        if (pocketShot != null) {
+
+            val gx = screenX(pocketShot.ghostX)
+            val gy = screenY(pocketShot.ghostY)
+
+            val px = screenX(pocketShot.pocket.x)
+            val py = screenY(pocketShot.pocket.y)
+
+            // Cue ball to ghost ball
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = 4f
+            paint.color = Color.CYAN
+            canvas.drawLine(cx, cy, gx, gy, paint)
+
+            // Target ball to selected pocket
+            paint.color = Color.YELLOW
+            paint.strokeWidth = 4f
+            canvas.drawLine(tx, ty, px, py, paint)
+
+            // Ghost ball marker
             paint.style = Paint.Style.FILL
+            paint.color = Color.BLUE
+            canvas.drawCircle(gx, gy, 9f, paint)
+        } else {
+            paint.style = Paint.Style.FILL
+            paint.color = Color.WHITE
+            paint.textSize = 17f
+            paint.textAlign = Paint.Align.CENTER
 
             canvas.drawText(
-                "NO VALID ROUTE",
+                "NO VALID POCKET SHOT",
                 (left + right) / 2f,
                 (top + bottom) / 2f,
                 paint
             )
         }
 
+        // Cue ball
         paint.style = Paint.Style.FILL
         paint.color = Color.WHITE
         canvas.drawCircle(cx, cy, 16f, paint)
 
+        // Target ball
         paint.color = Color.RED
         canvas.drawCircle(tx, ty, 16f, paint)
 
         paint.color = Color.WHITE
-        paint.textSize = 18f
+        paint.textSize = 17f
         paint.textAlign = Paint.Align.CENTER
 
         canvas.drawText("CUE", cx, cy - 22f, paint)

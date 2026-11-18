@@ -13,6 +13,7 @@ import android.widget.EditText
 import android.widget.Button
 import android.widget.Toast
 import com.poolcompanion.app.calculator.ShotCalculator
+import com.poolcompanion.app.engine.PocketEngine
 import com.poolcompanion.app.engine.ShotMode
 import com.poolcompanion.app.engine.ShotPathEngine
 import java.util.Locale
@@ -26,11 +27,22 @@ class MainActivity : Activity() {
     private lateinit var result: TextView
     private lateinit var aimView: AimView
     private lateinit var modeButtons: List<Button>
+    private lateinit var pocketButtons: List<Button>
 
     private var selectedMode = ShotMode.DIRECT
+    private var selectedPocket = "TOP RIGHT"
 
     private val green = Color.rgb(0, 255, 120)
     private val dark = Color.rgb(10, 15, 12)
+
+    private val pocketNames = listOf(
+        "TOP LEFT",
+        "TOP MIDDLE",
+        "TOP RIGHT",
+        "BOTTOM LEFT",
+        "BOTTOM MIDDLE",
+        "BOTTOM RIGHT"
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -38,7 +50,7 @@ class MainActivity : Activity() {
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setPadding(20, 16, 20, 16)
+            setPadding(16, 12, 16, 12)
             setBackgroundColor(dark)
         }
 
@@ -51,8 +63,8 @@ class MainActivity : Activity() {
         layout.addView(title)
 
         val subtitle = TextView(this).apply {
-            text = "ADVANCED AIM ENGINE"
-            textSize = 16f
+            text = "POCKET INTELLIGENCE ENGINE"
+            textSize = 15f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
         }
@@ -68,13 +80,7 @@ class MainActivity : Activity() {
         layout.addView(targetX)
         layout.addView(targetY)
 
-        val modeLabel = TextView(this).apply {
-            text = "SELECT SHOT MODE"
-            textSize = 14f
-            setTextColor(Color.WHITE)
-            gravity = Gravity.CENTER
-            setPadding(0, 12, 0, 8)
-        }
+        val modeLabel = createLabel("SELECT SHOT MODE")
         layout.addView(modeLabel)
 
         val modeLayout = LinearLayout(this).apply {
@@ -107,12 +113,50 @@ class MainActivity : Activity() {
                     ViewGroup.LayoutParams.WRAP_CONTENT,
                     1f
                 ).apply {
-                    setMargins(3, 3, 3, 3)
+                    setMargins(2, 2, 2, 2)
                 }
             )
         }
 
         layout.addView(modeLayout)
+
+        layout.addView(createLabel("SELECT TARGET POCKET"))
+
+        val firstPocketRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+
+        val secondPocketRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+
+        val buttons = pocketNames.map { name ->
+            createPocketButton(name)
+        }
+
+        pocketButtons = buttons
+
+        for (i in buttons.indices) {
+            val row = if (i < 3) {
+                firstPocketRow
+            } else {
+                secondPocketRow
+            }
+
+            row.addView(
+                buttons[i],
+                LinearLayout.LayoutParams(
+                    0,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    1f
+                ).apply {
+                    setMargins(2, 2, 2, 2)
+                }
+            )
+        }
+
+        layout.addView(firstPocketRow)
+        layout.addView(secondPocketRow)
 
         aimView = AimView(this)
 
@@ -120,7 +164,7 @@ class MainActivity : Activity() {
             aimView,
             LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                260
+                230
             )
         )
 
@@ -134,15 +178,17 @@ class MainActivity : Activity() {
                 calculateShot()
             }
         }
+
         layout.addView(calculate)
 
         result = TextView(this).apply {
-            text = "ANGLE: --\nPATH DISTANCE: --\nROUTE: --"
-            textSize = 17f
+            text = "ANGLE: --\nDISTANCE: --\nDIFFICULTY: --"
+            textSize = 16f
             setTextColor(green)
             gravity = Gravity.CENTER
-            setPadding(8, 14, 8, 14)
+            setPadding(8, 10, 8, 10)
         }
+
         layout.addView(result)
 
         val reset = Button(this).apply {
@@ -155,25 +201,42 @@ class MainActivity : Activity() {
                 targetY.text.clear()
 
                 selectedMode = ShotMode.DIRECT
+                selectedPocket = "TOP RIGHT"
+
                 aimView.setMode(selectedMode)
+                aimView.setPocket(selectedPocket)
                 aimView.setPoints(
                     100.0, 100.0, 200.0, 200.0
                 )
 
                 updateModeButtons()
+                updatePocketButtons()
 
                 result.text =
-                    "ANGLE: --\nPATH DISTANCE: --\nROUTE: --"
+                    "ANGLE: --\nDISTANCE: --\nDIFFICULTY: --"
             }
         }
+
         layout.addView(reset)
 
         aimView.setPoints(100.0, 100.0, 200.0, 200.0)
         aimView.setMode(selectedMode)
+        aimView.setPocket(selectedPocket)
 
         updateModeButtons()
+        updatePocketButtons()
 
         setContentView(layout)
+    }
+
+    private fun createLabel(value: String): TextView {
+        return TextView(this).apply {
+            text = value
+            textSize = 13f
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+            setPadding(0, 8, 0, 5)
+        }
     }
 
     private fun createInput(label: String): EditText {
@@ -187,7 +250,7 @@ class MainActivity : Activity() {
                 InputType.TYPE_NUMBER_FLAG_DECIMAL or
                 InputType.TYPE_NUMBER_FLAG_SIGNED
 
-            setPadding(15, 5, 15, 5)
+            setPadding(15, 4, 15, 4)
         }
     }
 
@@ -197,12 +260,26 @@ class MainActivity : Activity() {
     ): Button {
         return Button(this).apply {
             text = label
-            textSize = 11f
+            textSize = 10f
 
             setOnClickListener {
                 selectedMode = mode
                 aimView.setMode(mode)
                 updateModeButtons()
+                calculateShot(false)
+            }
+        }
+    }
+
+    private fun createPocketButton(name: String): Button {
+        return Button(this).apply {
+            text = name
+            textSize = 8f
+
+            setOnClickListener {
+                selectedPocket = name
+                aimView.setPocket(name)
+                updatePocketButtons()
                 calculateShot(false)
             }
         }
@@ -223,6 +300,20 @@ class MainActivity : Activity() {
             )
 
             modeButtons[i].setTextColor(
+                if (selected) Color.BLACK else Color.WHITE
+            )
+        }
+    }
+
+    private fun updatePocketButtons() {
+        for (i in pocketButtons.indices) {
+            val selected = pocketNames[i] == selectedPocket
+
+            pocketButtons[i].setBackgroundColor(
+                if (selected) Color.YELLOW else Color.DKGRAY
+            )
+
+            pocketButtons[i].setTextColor(
                 if (selected) Color.BLACK else Color.WHITE
             )
         }
@@ -250,62 +341,52 @@ class MainActivity : Activity() {
             y2 !in 0.0..500.0) {
 
             if (showErrors) {
-                showMessage(
-                    "X: 0-1000, Y: 0-500"
-                )
+                showMessage("X: 0-1000, Y: 0-500")
             }
             return
         }
 
-        val shot = ShotCalculator.calculate(
-            x1, y1, x2, y2
+        val pocketShot = PocketEngine.evaluate(
+            x1, y1, x2, y2, selectedPocket
         )
-
-        if (shot == null) {
-            if (showErrors) {
-                showMessage(
-                    "Ball positions must be different"
-                )
-            }
-            return
-        }
-
-        val path = ShotPathEngine.calculate(
-            x1, y1, x2, y2, selectedMode
-        )
-
-        if (path == null) {
-            aimView.setPoints(x1, y1, x2, y2)
-
-            result.text =
-                "NO VALID ROUTE\nTry another mode or position"
-
-            return
-        }
 
         aimView.setPoints(x1, y1, x2, y2)
 
-        val firstPoint = path.bouncePoints.firstOrNull()
-
-        val angle = if (firstPoint != null) {
-            ShotCalculator.calculate(
-                x1, y1, firstPoint.x, firstPoint.y
-            )?.angle ?: shot.angle
-        } else {
-            shot.angle
+        if (pocketShot == null) {
+            result.text =
+                "NO VALID POCKET SHOT\nTry another pocket or position"
+            return
         }
 
-        val routeText = if (path.bouncePoints.isEmpty()) {
-            "DIRECT"
-        } else {
-            path.routeName
-        }
+        val aim = ShotCalculator.calculate(
+            x1, y1,
+            pocketShot.ghostX,
+            pocketShot.ghostY
+        )
+
+        val modePath = ShotPathEngine.calculate(
+            x1, y1, x2, y2, selectedMode
+        )
+
+        val routeText = modePath?.routeName
+            ?: "NO VALID CUSHION ROUTE"
+
+        val totalDistance =
+            pocketShot.cueDistance + pocketShot.objectDistance
 
         result.text = String.format(
             Locale.US,
-            "SHOT ANGLE: %.2f°\nPATH DISTANCE: %.2f units\nROUTE: %s",
-            angle,
-            path.distance,
+            "AIM ANGLE: %.2f°\n" +
+                "POCKET: %s\n" +
+                "TOTAL DISTANCE: %.2f units\n" +
+                "CUT ANGLE: %.2f°\n" +
+                "DIFFICULTY: %s\n" +
+                "CUSHION MODE: %s",
+            aim?.angle ?: 0.0,
+            pocketShot.pocket.name,
+            totalDistance,
+            pocketShot.cutAngle,
+            pocketShot.difficulty,
             routeText
         )
     }
@@ -318,4 +399,3 @@ class MainActivity : Activity() {
         ).show()
     }
 }
-
